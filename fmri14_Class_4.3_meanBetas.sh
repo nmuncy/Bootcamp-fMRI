@@ -1,42 +1,59 @@
 #!/bin/bash
 
+#SBATCH --time=10:00:00   # walltime
+#SBATCH --ntasks=4   # number of processor cores (i.e. tasks)
+#SBATCH --nodes=1   # number of nodes
+#SBATCH --mem-per-cpu=6gb   # memory per CPU core
+#SBATCH -J "sttR10"   # job name
+
+# Compatibility variables for PBS. Delete if not needed.
+export PBS_NODEFILE=`/fslapps/fslutils/generate_pbs_nodefile`
+export PBS_JOBID=$SLURM_JOB_ID
+export PBS_O_WORKDIR="$SLURM_SUBMIT_DIR"
+export PBS_QUEUE=batch
+
+# Set the max number of threads to use for programs using OpenMP. Should be <= ppn. Does nothing if the program doesn't use OpenMP.
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE
 
 
-###--- Notes:
+
+
+
+
+# Written by Nathan Muncy on 11/28/18
+
+
+###--- Notes, in no particular order
 #
-# A cannibalized script from a project. This script will:
+# 1) the script will split the cluster file into multiple masks, and pull betas from each participant.
 #
-# 	a) make clusters from etac output
-# 	b) blur deconvolved data according to the blur used for the cluster
-#	c) pull mean beta-coefficients of the cluster and write it to an
-#		output file.
-
-
-
-
-### Variables
+# 2) assumes clusters from step4 output have been saved in Clust_$fileArr format
+#		will use the comparisonString portion to keep different group analyses straight
+#		comparisonString should match the decon prefix (step4 $etacList)
 #
-# This script is written to orient itself from this section. Assuming you
-# have the same organization and file names as me, simply update this section
-# and run the script.
+# 3) assumes that decon files exist locally (bring them back from the supercomputer)
+#
+# 4) Written for the output of ETAC - will pull betas for each appropriate blur from eaach cluster
 
-workDir=~/compute/Bootcamp/Nate										# Dir with all subjects dir
-grpDir=${workDir}/Analyses/grpAnalysis								# where the ETAC output is
-clustDir=${grpDir}/etac_clusters									# to be made
-outDir=${grpDir}/etac_betas											# to be made
 
-fileArr=(T1)														# decon files from which betas will be extracted - should match previous step
-arrA=(1)															# sub-bricks corresponding to $fileArr
-arrB=(4)
+
+# Variables
+workDir=~/compute/Bootcamp/Nate										###??? Update this section
+grpDir=${workDir}/Analyses/grpAnalysis
+clustDir=${grpDir}/etac_clusters
+outDir=${grpDir}/etac_betas
+refDir=${workDir}/s1295												# reference file for dimensions etc
+
+
+fileArr=(T1)														# decon files from which betas will be extracted - should match step4.
+arrA=(53)															# sub-bricks corresponding to $fileArr
+arrB=(56)
 arrLen=${#arrA[@]}
 
-blurArr=(4 6 8)														# blurs used in ETAC
-blurLen=${#blurArr[@]}
 
 
 
-
-### function - search array for string
+# function - search array for string
 MatchString (){
 	local e match="$1"
 	shift
@@ -45,122 +62,86 @@ MatchString (){
 }
 
 
+# check
+test1=${#fileArr[@]}; test2=${#arrB[@]}
+if [ $test1 != $arrLen ] || [ $test2 != $arrLen ]; then
+	echo "Replace user and try again - script set up incorrectly" >&2
+	exit 1
+fi
+
+
 
 
 ### make clusters, tables
-#
-# This will render group-level clusters for each blur used in ETAC.
-# It will also produce a table.
-
-
-# make output dir
 mkdir $outDir $clustDir
-cd ${grpDir}/etac_indiv
+cd $grpDir
 
-# for each mask
-for i in FINAL_*allP*.HEAD; do
+for i in FINALall_*.HEAD; do
 
-	# determine names from file name
-	tmp1=${i%_ET*}; pref=${tmp1##*_}
-	tmp2=${i#*_}; blur=${tmp2%%_*}
+	tmp1=${i#*_}; pref=${tmp1%%_*}
 
-	# make cluster file
-	if [ ! -f ${clustDir}/Clust_${pref}_${blur}_table.txt ]; then
+	if [ ! -f ${clustDir}/Clust_${pref}_table.txt ]; then
 
 		3dclust -1Dformat -nosum -1dindex 0 \
 		-1tindex 0 -2thresh -0.5 0.5 -dxyz=1 \
-		-savemask Clust_${pref}_${blur}_mask \
-		1.01 5 $i > Clust_${pref}_${blur}_table.txt
+		-savemask Clust_${pref}_mask \
+		1.01 5 $i > Clust_${pref}_table.txt
+
+		mv Clust* $clustDir
 	fi
 done
 
-# keep things clean
-mv Clust* $clustDir
 
 
 
-### pull mean betas
-#
-# for e/cluster from e/comparison from e/subject
-# For each cluster, blur the deconvolved data appropriately and
-# extract the mean beta coefficient. Write it to a txt file in
-# $outDir
-
-
+### pull mean betas for e/cluster from e/comparison from e/subject
 cd $clustDir
 
-# for each value of $fileArr
 c=0; while [ $c -lt $arrLen ]; do
 
-	# determine string, betas
 	hold=${fileArr[$c]}
 	betas=${arrA[$c]},${arrB[$c]}
-
-	# make list of subjects to include, set it to array
-	unset subjHold
 	arrRem=(`cat ${grpDir}/info_rmSubj_${hold}.txt`)
-	for i in ${workDir}/s*; do
-		subj=${i##*\/}
-		MatchString "$subj" "${arrRem[@]}"
-		if [ $? == 1 ]; then
-			subjHold+="$subj "
-		fi
-	done
-	subjList=(${subjHold})
 
 
-	# for each blur
-	d=0; while [ $d -lt $blurLen ]; do
+	# split clust masks
+	if [ -f Clust_${hold}_mask+tlrc.HEAD ]; then
+		if [ ! -f Clust_${hold}_c1+tlrc.HEAD ]; then
 
-		blurInt=${blurArr[$d]}
+			3dcopy Clust_${hold}_mask+tlrc ${hold}.nii.gz
+			num=`3dinfo Clust_${hold}_mask+tlrc | grep "At sub-brick #0 '#0' datum type is short" | sed 's/[^0-9]*//g' | sed 's/^...//'`
 
-		if [ -f Clust_${hold}_b${blurInt}_mask+tlrc.HEAD ]; then
-			if [ ! -f Clust_${hold}_b${blurInt}_c1+tlrc.HEAD ]; then
+			for (( j=1; j<=$num; j++ )); do
+				if [ ! -f Clust_${hold}_c${j}+tlrc.HEAD ]; then
 
-				# determine number of clusters in Clust_mask
-				3dcopy Clust_${hold}_b${blurInt}_mask+tlrc ${hold}_b${blurInt}.nii.gz
-				num=`3dinfo Clust_${hold}_b${blurInt}_mask+tlrc | grep "At sub-brick #0 '#0' datum type is short" | sed 's/[^0-9]*//g' | sed 's/^...//'`
-
-				# extract each cluster in Clust_mask, make it its own file
-				for (( j=1; j<=$num; j++ )); do
-					if [ ! -f Clust_${hold}_b${blurInt}_c${j}+tlrc.HEAD ]; then
-
-						c3d ${hold}_b${blurInt}.nii.gz -thresh $j $j 1 0 -o ${hold}_b${blurInt}_${j}.nii.gz
-						3dcopy ${hold}_b${blurInt}_${j}.nii.gz Clust_${hold}_b${blurInt}_c${j}+tlrc
-					fi
-				done
-				rm *.nii.gz
-			fi
-
-
-			# for each individual cluster
-			for i in Clust_${hold}_b${blurInt}_c*+tlrc.HEAD; do
-
-				# determine names, name output, clear it
-				tmp=${i##*_}
-				cnum=${tmp%+*}
-				print=${outDir}/Betas_${hold}_b${blurInt}_${cnum}.txt
-				> $print
-
-				# for each subject
-				for j in ${subjList[@]}; do
-
-					subjDir=${workDir}/${j}
-					decon=stats
-
-					# blur deconvovled data, according to cluster blur
-					if [ ! -f ${subjDir}/${hold}_${decon}_blur${blurInt}+tlrc.HEAD ]; then
-						3dmerge -prefix ${subjDir}/${hold}_${decon}_blur${blurInt} -1blur_fwhm $blurInt -doall ${subjDir}/${hold}_${decon}+tlrc
-					fi
-
-					# pull mean beta coefficient from blurred decon file, print it out
-					file=${subjDir}/${hold}_${decon}_blur${blurInt}+tlrc
-					stats=`3dROIstats -mask $i "${file}[${betas}]"`
-					echo "$j $stats" >> $print
-				done
+					c3d ${hold}.nii.gz -thresh $j $j 1 0 -o ${hold}_${j}.nii.gz
+					3dcopy ${hold}_${j}.nii.gz Clust_${hold}_c${j}+tlrc
+				fi
 			done
+			rm *.nii.gz
 		fi
-		let d=$[$d+1]
-	done
+
+
+		# pull betas
+		for i in Clust_${hold}_c*+tlrc.HEAD; do
+
+			tmp=${i##*_}; cnum=${tmp%+*}
+			print=${outDir}/Betas_${hold}_${cnum}.txt
+			> $print
+
+			for j in ${workDir}/s*; do
+
+				subj=${j##*\/}
+				MatchString "$subj" "${arrRem[@]}"
+
+				if [ $? == 1 ]; then
+
+					file=${j}/${hold}_stats+tlrc
+					stats=`3dROIstats -mask ${i%.*} "${file}[${betas}]"`
+					echo "$subj $stats" >> $print
+				fi
+			done
+		done
+	fi
 	let c=$[$c+1]
 done
