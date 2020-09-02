@@ -1,0 +1,42 @@
+### Notes from 9/5, in no particular order
+# Written by Nathan Muncy on 9/6
+
+
+# edit your bash profile
+nano ~/.bash_profile
+
+
+# update your environment
+source ~/.bash_profile
+
+
+# alias syntax, for shortcuts
+alias string=‘<commands>’
+
+
+# change your PS1
+PS1=‘[\u: \W]’
+
+
+# Update path
+PATH=${PATH}:\
+/path/to/something/:\
+/path/to/something/else/:\
+/another/path
+
+export PATH
+
+
+# make a script, change permissions
+touch script.sh
+chmod +x script.sh
+
+
+# shebang at the top of the script
+#!/bin/bash
+
+
+# for loop syntax
+for i in {1..9}; do 
+echo $i
+done

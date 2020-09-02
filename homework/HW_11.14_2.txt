@@ -1,0 +1,13 @@
+
+- Use dcm2nii to construct structural and functional nifti files. 
+
+- Have the same naming convention/organization as in Vedder/Bootcamp/Nate.
+
+- The raw data is located in Vedder/Bootcamp/Practice_data.
+
+
+structural syntax:
+dcm2nii -a Y -g Y -x N -o </path/to/destination/> </path/to/subject/dicoms/>*.dcm
+
+functional syntax:
+dcm2nii -o </path/to/destination/> -a Y -g Y -d N -r N -e N </path/to/subject/dicoms/>*.dcm

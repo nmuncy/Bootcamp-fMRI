@@ -1,0 +1,36 @@
+### Example loops
+
+
+1) loop through list
+
+	for i in this that these; do
+		echo $i
+	done
+
+
+2) loop through same list as (1) but using brackets
+
+	for j in th{is,at,ese}; do
+		echo $j
+	done
+
+
+3) loop through many numbers
+
+	for a in {1..10}; do
+		echo $a
+	done
+
+
+4) loop through list of combined brackets expanded
+
+	for k in {A..G}{M..Z}; do
+		echo $k
+	done
+
+
+5) another example
+
+	for b in start_{1..6}{a..d}_finish; do 
+		echo $b
+	done

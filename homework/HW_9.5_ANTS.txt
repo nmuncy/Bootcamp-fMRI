@@ -1,0 +1,46 @@
+# Instructions for installing ANTs on the supercomputer.
+# Written by Nathan Muncy on 8/31/18
+#
+# Lines which are not commented out are commands that can be run, except for the PATH part.
+
+
+
+# This is done on the supercomputer
+
+
+
+## navigate and clone software
+cd ~/research_bin
+wget https://github.com/ANTsX/ANTs/archive/v2.3.1.tar.gz
+tar xf v2.3.1.tar.gz
+
+
+
+## setup dir hierarchy
+mkdir antsbin && cd antsbin
+
+
+
+## install ANTs
+module purge && module load defaultenv
+module load cmake/3.12
+CC=`which gcc` CXX=`which g++` cmake ../ANTs-2.3.1 -DCMAKE_INSTALL_PREFIX=$HOME/work/ants/install
+
+# the following step will run for a few hours
+make -j 4
+
+
+
+## organize
+cp ${HOME}/research_bin/ANTs/Scripts/* ${HOME}/research_bin/antsbin/bin
+
+
+
+## append your PATH and set an ANTSPATH variable in your env. 
+# Example: 
+export ANTSPATH=${HOME}/research_bin/antsbin/bin
+PATH=${PATH}:${ANTSPATH}
+
+
+## Test, look for print to stdout
+ants.sh

@@ -1,0 +1,4 @@
+
+The AFNI file is called macosx_10.7_Intel_64. Follow the instructions here to install on your local system:
+
+https://afni.nimh.nih.gov/pub/dist/doc/htmldoc/background_install/install_instructs/steps_mac.html

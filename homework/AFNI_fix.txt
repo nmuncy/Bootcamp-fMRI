@@ -1,0 +1,32 @@
+AFNI error: R_io.so not found
+
+Solution: 
+	1) make sure xquartz is installed!
+		
+		step a.ii under "Install Xcode and XQuartz"
+
+	2) fix pathways (.bash_profile, .bashrc, .cshrc)
+
+		echo "setenv DYLD_LIBRARY_PATH /opt/X11/lib/flat_namespace" > ~/.cshrc
+		echo "export DYLD_LIBRARY_PATH=/opt/X11/lib/flat_namespace" > ~/.bashrc
+		echo "source ~/.bashrc" >> ~/.bash_profile
+
+		also, make sure your .bash_profile path looks like this:
+
+		PATH=${PATH}:\
+		/path/to/something:\
+		/another/path/here:\
+		/You/get/the/idea
+
+		export PATH
+
+	3) Fix the package type
+
+		@update.afni.binaries -package macosx_10.7_Intel_64 
+
+
+	4) Add a fallback path
+
+		echo "export DYLD_FALLBACK_LIBRARY_PATH=~/abin" >> ~/.bash_profile
+
+
